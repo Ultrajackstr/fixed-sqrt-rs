@@ -9,17 +9,15 @@ use fixed::types::extra::{LeEqU8, LeEqU16, LeEqU32, LeEqU64, LeEqU128,
   Unsigned};
 use integer_sqrt::IntegerSquareRoot;
 
-pub trait FixedSqrt <F : Fixed> where
-  F::Bits : Shl <isize, Output=F::Bits> + IntegerSquareRoot
+pub trait FixedSqrt : Fixed where
+  Self::Bits : Shl <isize, Output=Self::Bits> + IntegerSquareRoot
 {
   fn sqrt (self) -> Self;
 }
 
 macro_rules! impl_sqrt_unsigned {
   ($signed:ident, $leq:ident) => {
-    impl <U> FixedSqrt <$signed <U>> for $signed <U>
-      where U : Unsigned + $leq
-    {
+    impl <U> FixedSqrt for $signed <U> where U : Unsigned + $leq {
       fn sqrt (self) -> Self {
         $signed::from_bits(self.to_bits().integer_sqrt() <<
           (<$signed <U> as Fixed>::Frac::ISIZE/2 +
@@ -37,9 +35,7 @@ impl_sqrt_unsigned!(FixedU128, LeEqU128);
 
 macro_rules! impl_sqrt_signed {
   ($signed:ident, $leq:ident) => {
-    impl <U> FixedSqrt <$signed <U>> for $signed <U>
-      where U : Unsigned + $leq
-    {
+    impl <U> FixedSqrt for $signed <U> where U : Unsigned + $leq {
       fn sqrt (self) -> Self {
         if self.is_negative() {
           panic!("fixed point square root of a negative number");
