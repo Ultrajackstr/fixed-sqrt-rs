@@ -7,6 +7,20 @@
 //! a `typenum` parameter), and generic trait impls don't allow this kind of
 //! specialization based on mutually exclusive traits.
 //!
+//! Computing the square root with an odd number of fractional bits requires one
+//! extra bit to shift into before performing the square root. Since square root
+//! is defined only for positive numbers, this can be done for all *signed*
+//! fixed-point numbers (up to and including `FixedI128`) utilizing the sign bit
+//! for the overflow.
+//!
+//! For unsigned fixed-point numbers, if an extra bit is needed (i.e. if the
+//! MSB is 1), this requires a static cast to the next larger primitive integer
+//! type before computing the square root. As a result, the square root trait
+//! is *not* implemented for `FixedU128` with an odd number fractional bits
+//! since that would require a square root algorithm for 256-bit integers which
+//! isn't provided by the `integer-sqrt` library.
+//!
+//!
 //! # Accuracy
 //!
 //! TODO
