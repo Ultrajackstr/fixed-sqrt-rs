@@ -135,7 +135,6 @@ fn main() {
     }
   }
 
-  /*
   exhaustive_unsigned!(U8F0);
   exhaustive_unsigned!(U7F1);
   exhaustive_unsigned!(U6F2);
@@ -145,9 +144,7 @@ fn main() {
   exhaustive_unsigned!(U2F6);
   exhaustive_unsigned!(U1F7);
   exhaustive_unsigned!(U0F8);
-  */
 
-  /*
   exhaustive_signed!(I8F0);
   exhaustive_signed!(I7F1);
   exhaustive_signed!(I6F2);
@@ -157,7 +154,6 @@ fn main() {
   exhaustive_signed!(I2F6);
   exhaustive_signed!(I1F7);
   exhaustive_signed!(I0F8);
-  */
 
   exhaustive_unsigned!(U16F0);
   exhaustive_unsigned!(U15F1);
