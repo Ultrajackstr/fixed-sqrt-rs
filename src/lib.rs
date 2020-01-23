@@ -69,7 +69,7 @@ macro_rules! impl_sqrt_unsigned_even {
       fn sqrt (self) -> Self {
         $unsigned::from_bits (
           self.to_bits().integer_sqrt() <<
-            (<$unsigned <U> as Fixed>::Frac::ISIZE/2)
+            (<$unsigned <U> as Fixed>::Frac::USIZE/2)
         )
       }
     }
@@ -89,14 +89,14 @@ macro_rules! impl_sqrt_unsigned_odd {
         {
           let bits = bits as $higher << 1;
           let sqrt =
-            bits.integer_sqrt() << (<$unsigned <U> as Fixed>::Frac::ISIZE/2);
+            bits.integer_sqrt() << (<$unsigned <U> as Fixed>::Frac::USIZE/2);
           // square root should be within max value
           debug_assert!(sqrt <= <$unsigned <U> as Fixed>::Bits::max_value()
             as $higher);
           sqrt as <$unsigned <U> as Fixed>::Bits
         } else {
           let bits = bits << 1;
-          bits.integer_sqrt() << (<$unsigned <U> as Fixed>::Frac::ISIZE/2)
+          bits.integer_sqrt() << (<$unsigned <U> as Fixed>::Frac::USIZE/2)
         };
         $unsigned::from_bits (sqrt)
       }
@@ -126,7 +126,7 @@ macro_rules! impl_sqrt_signed_even {
         }
         let n = $signed::from_bits(
           self.to_bits().integer_sqrt() <<
-            (<$signed <U> as Fixed>::Frac::ISIZE/2)
+            (<$signed <U> as Fixed>::Frac::USIZE/2)
         );
         if n.is_negative() {
           panic!("fixed point square root out of range");
@@ -156,7 +156,7 @@ macro_rules! impl_sqrt_signed_odd {
           0x0);
         let bits = (self.to_bits() << 1) as $unsigned;
         let sqrt =
-          bits.integer_sqrt() << (<$signed <U> as Fixed>::Frac::ISIZE/2);
+          bits.integer_sqrt() << (<$signed <U> as Fixed>::Frac::USIZE/2);
         let n = $signed::from_bits (sqrt as <$signed <U> as Fixed>::Bits);
         if n.is_negative() {
           panic!("fixed point square root out of range");
@@ -203,7 +203,7 @@ mod tests {
               let h_sqrt = h.sqrt();
               let err = (h_f64.sqrt() - h_sqrt.to_num::<f64>()).abs();
               if err > $maxerr {
-                let ftype = format!("{}<U{}>", stringify!($fixed), U::ISIZE);
+                let ftype = format!("{}<U{}>", stringify!($fixed), U::USIZE);
                 show!((ftype, h, h_sqrt, err));
                 //assert!(err <= $maxerr);
               }
@@ -212,7 +212,7 @@ mod tests {
               let l_sqrt = l.sqrt();
               let err = (l_f64.sqrt() - l_sqrt.to_num::<f64>()).abs();
               if err > $maxerr {
-                let ftype = format!("{}<U{}>", stringify!($fixed), U::ISIZE);
+                let ftype = format!("{}<U{}>", stringify!($fixed), U::USIZE);
                 show!((ftype, l, l_sqrt, err));
                 //assert!(err <= $maxerr);
               }
@@ -279,13 +279,13 @@ mod tests {
                 continue
               }
               // skip out of domain
-              if U::ISIZE == $unsigned::ISIZE-1 && h_f64 >= 0.5 {
+              if U::USIZE == $unsigned::USIZE-1 && h_f64 >= 0.5 {
                 continue
               }
               let h_sqrt = h.sqrt();
               let err = h_f64.sqrt() - h_sqrt.to_num::<f64>();
               if err > $maxerr {
-                let ftype = format!("{}<U{}>", stringify!($fixed), U::ISIZE);
+                let ftype = format!("{}<U{}>", stringify!($fixed), U::USIZE);
                 show!((ftype, h, h_sqrt, err));
                 assert!(err <= $maxerr);
               }
@@ -296,13 +296,13 @@ mod tests {
                 continue
               }
               // skip out of domain
-              if U::ISIZE == $unsigned::ISIZE-1 && l_f64 >= 0.5 {
+              if U::USIZE == $unsigned::USIZE-1 && l_f64 >= 0.5 {
                 continue
               }
               let l_sqrt = l.sqrt();
               let err = l_f64.sqrt() - l_sqrt.to_num::<f64>();
               if err > $maxerr {
-                let ftype = format!("{}<U{}>", stringify!($fixed), U::ISIZE);
+                let ftype = format!("{}<U{}>", stringify!($fixed), U::USIZE);
                 show!((ftype, l, l_sqrt, err));
                 assert!(err <= $maxerr);
               }
