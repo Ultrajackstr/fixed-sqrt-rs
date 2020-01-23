@@ -1,5 +1,19 @@
 //! Square root trait for fixed-point numbers using integer square root
-//! algorithm
+//! algorithm.
+//!
+//! This functionality is split into two traits: `FixedSqrtEven` (re-exported as
+//! `FixedSqrt`) and `FixedSqrtOdd`. This is because the square root algorithm
+//! needs to be specialized for an odd number of fractional bits (represented as
+//! a `typenum` parameter), and generic trait impls don't allow this kind of
+//! specialization based on mutually exclusive traits.
+//!
+//! # Accuracy
+//!
+//! TODO
+//!
+//! # Panics
+//!
+//! TODO
 
 #[allow(unused_macros)]
 macro_rules! show {
@@ -49,24 +63,28 @@ macro_rules! impl_sqrt_unsigned_even {
 }
 
 macro_rules! impl_sqrt_unsigned_odd {
-  ($signed:ident, $leq:ident, $higher:ty) => {
-    impl <U> FixedSqrtOdd for $signed <U> where
+  ($unsigned:ident, $leq:ident, $higher:ty) => {
+    impl <U> FixedSqrtOdd for $unsigned <U> where
       U : Unsigned + $leq + Rem <U2>,
       typenum::Mod <U, U2> : typenum::Same <U1>
     {
       fn sqrt (self) -> Self {
-        let odd = <$signed <U> as Fixed>::Frac::ISIZE%2 == 1;
-        let int = if odd {
-          let bits = (self.to_bits() as $higher) << 1;
-          (bits.integer_sqrt() <<
-            (<$signed <U> as Fixed>::Frac::ISIZE/2))
-          as <$signed <U> as Fixed>::Bits
+        let bits = self.to_bits();
+        let sqrt = if
+          bits & (1 as <$unsigned <U> as Fixed>::Bits).rotate_right (1) > 0
+        {
+          let bits = bits as $higher << 1;
+          let sqrt =
+            bits.integer_sqrt() << (<$unsigned <U> as Fixed>::Frac::ISIZE/2);
+          // square root should be within max value
+          debug_assert!(sqrt <= <$unsigned <U> as Fixed>::Bits::max_value()
+            as $higher);
+          sqrt as <$unsigned <U> as Fixed>::Bits
         } else {
-          self.to_bits().integer_sqrt() <<
-            (<$signed <U> as Fixed>::Frac::ISIZE/2)
+          let bits = bits << 1;
+          bits.integer_sqrt() << (<$unsigned <U> as Fixed>::Frac::ISIZE/2)
         };
-        let n = $signed::from_bits(int);
-        n
+        $unsigned::from_bits (sqrt)
       }
     }
   }
@@ -107,7 +125,7 @@ macro_rules! impl_sqrt_signed_even {
 }
 
 macro_rules! impl_sqrt_signed_odd {
-  ($signed:ident, $leq:ident, $higher:ty) => {
+  ($signed:ident, $leq:ident, $unsigned:ty) => {
     impl <U> FixedSqrtOdd for $signed <U> where
       U : Unsigned + $leq + Rem <U2>,
       typenum::Mod <U, U2> : typenum::Same <U1>
@@ -116,17 +134,16 @@ macro_rules! impl_sqrt_signed_odd {
         if self.is_negative() {
           panic!("fixed point square root of a negative number");
         }
-        let odd = <$signed <U> as Fixed>::Frac::ISIZE%2 == 1;
-        let int = if odd {
-          let bits = (self.to_bits() as $higher) << 1;
-          (bits.integer_sqrt() <<
-            (<$signed <U> as Fixed>::Frac::ISIZE/2))
-          as <$signed <U> as Fixed>::Bits
-        } else {
-          self.to_bits().integer_sqrt() <<
-            (<$signed <U> as Fixed>::Frac::ISIZE/2)
-        };
-        let n = $signed::from_bits(int);
+        // because the msb of a non-negative number is zero, it is always
+        // safe to shift, but we need to compute the square root on the unsigned
+        // integer type
+        debug_assert_eq!(
+          self.to_bits() & (1 as <$signed <U> as Fixed>::Bits).rotate_right (1),
+          0x0);
+        let bits = (self.to_bits() << 1) as $unsigned;
+        let sqrt =
+          bits.integer_sqrt() << (<$signed <U> as Fixed>::Frac::ISIZE/2);
+        let n = $signed::from_bits (sqrt as <$signed <U> as Fixed>::Bits);
         if n.is_negative() {
           panic!("fixed point square root out of range");
         } else {
@@ -142,10 +159,11 @@ impl_sqrt_signed_even!(FixedI16,  LeEqU16);
 impl_sqrt_signed_even!(FixedI32,  LeEqU32);
 impl_sqrt_signed_even!(FixedI64,  LeEqU64);
 impl_sqrt_signed_even!(FixedI128, LeEqU128);
-impl_sqrt_signed_odd!(FixedI8,   LeEqU8,  i16);
-impl_sqrt_signed_odd!(FixedI16,  LeEqU16, i32);
-impl_sqrt_signed_odd!(FixedI32,  LeEqU32, i64);
-impl_sqrt_signed_odd!(FixedI64,  LeEqU64, i128);
+impl_sqrt_signed_odd!(FixedI8,   LeEqU8,   u8);
+impl_sqrt_signed_odd!(FixedI16,  LeEqU16,  u16);
+impl_sqrt_signed_odd!(FixedI32,  LeEqU32,  u32);
+impl_sqrt_signed_odd!(FixedI64,  LeEqU64,  u64);
+impl_sqrt_signed_odd!(FixedI128, LeEqU128, u128);
 
 #[cfg(test)]
 mod tests {
