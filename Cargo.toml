@@ -9,6 +9,5 @@ edition = "2018"
 [dependencies]
 fixed = "0.5.*"
 integer-sqrt = "0.1.*"
-
-[dev-dependencies]
+lazy_static = "1.*"
 typenum = "1.*"
