@@ -200,7 +200,7 @@ macro_rules! impl_sqrt_signed_odd {
         let sqrt =
           bits.integer_sqrt() << (<$signed <U> as Fixed>::Frac::USIZE/2);
         let n = $signed::from_bits (sqrt as <$signed <U> as Fixed>::Bits);
-        // NOTE: this should be impossible for odd fractional bits
+        // NOTE: this should never fail for odd fractional bits
         debug_assert!(n.count_ones() == 0 || n.is_positive());
         n
       }
@@ -252,7 +252,7 @@ mod tests {
               if err > $maxerr {
                 let ftype = format!("{}<U{}>", stringify!($fixed), U::USIZE);
                 show!((ftype, h, h_sqrt, err));
-                //assert!(err <= $maxerr);
+                assert!(err <= $maxerr);
               }
             }
             if let Some (l) = $fixed::<U>::checked_from_num(l_f64) {
@@ -261,7 +261,7 @@ mod tests {
               if err > $maxerr {
                 let ftype = format!("{}<U{}>", stringify!($fixed), U::USIZE);
                 show!((ftype, l, l_sqrt, err));
-                //assert!(err <= $maxerr);
+                assert!(err <= $maxerr);
               }
             }
           }
@@ -280,7 +280,7 @@ mod tests {
               if err > $maxerr {
                 let ftype = format!("{}<U{}>", stringify!($fixed), U::USIZE);
                 show!((ftype, h, h_sqrt, err));
-                //assert!(err <= $maxerr);
+                assert!(err <= $maxerr);
               }
             }
             if let Some (l) = $fixed::<U>::checked_from_num(l_f64) {
@@ -289,7 +289,7 @@ mod tests {
               if err > $maxerr {
                 let ftype = format!("{}<U{}>", stringify!($fixed), U::USIZE);
                 show!((ftype, l, l_sqrt, err));
-                //assert!(err <= $maxerr);
+                assert!(err <= $maxerr);
               }
             }
           }
@@ -343,7 +343,7 @@ mod tests {
       }
     }
 
-    test_sqrt_unsigned!(test_sqrt_u128_even, FixedU128, U128, 1.0);
+    test_sqrt_unsigned!(test_sqrt_u128_even, FixedU128, U128, 8.0);
     test_sqrt_unsigned!(test_sqrt_u64_even, (test_sqrt_u64_odd), FixedU64, U64, 1.0);
     test_sqrt_unsigned!(test_sqrt_u32_even, (test_sqrt_u32_odd), FixedU32, U32, 1.0);
     test_sqrt_unsigned!(test_sqrt_u16_even, (test_sqrt_u16_odd), FixedU16, U16, 1.0);
