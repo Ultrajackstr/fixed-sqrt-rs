@@ -58,39 +58,25 @@ use fixed::{FixedI8, FixedI16, FixedI32, FixedI64, FixedU8, FixedU16,
 use fixed::traits::Fixed;
 use fixed::types::extra::*;
 
-pub use integer_sqrt::IntegerSquareRoot;
+pub mod traits;
+
+use self::traits::*;
 
 pub use FixedSqrtEven as FixedSqrt;
 
+/// Square root algorithm for an even number of fractional bits
 pub trait FixedSqrtEven : Fixed where
-  Self::Bits : Shl <isize, Output=Self::Bits> + IntegerSquareRoot
+  Self::Bits : Shl <usize, Output=Self::Bits> + IntegerSquareRoot
 {
   fn sqrt (self) -> Self;
 }
 
+/// Square root algorithm for an odd number of fractional bits
 pub trait FixedSqrtOdd : Fixed where
-  Self::Bits : Shl <isize, Output=Self::Bits> + IntegerSquareRoot
+  Self::Bits : Shl <usize, Output=Self::Bits> + IntegerSquareRoot
 {
   fn sqrt (self) -> Self;
 }
-
-pub mod traits {
-  use fixed::types::extra::*;
-
-  pub trait LtU8   : LeEqU8   + typenum::IsLess <U8,   Output=True> {}
-  pub trait LtU16  : LeEqU16  + typenum::IsLess <U16,  Output=True> {}
-  pub trait LtU32  : LeEqU32  + typenum::IsLess <U32,  Output=True> {}
-  pub trait LtU64  : LeEqU64  + typenum::IsLess <U64,  Output=True> {}
-  pub trait LtU128 : LeEqU128 + typenum::IsLess <U128, Output=True> {}
-
-  impl <U> LtU8  for U where U : LeEqU8  + typenum::IsLess <U8,  Output=True> {}
-  impl <U> LtU16 for U where U : LeEqU16 + typenum::IsLess <U16, Output=True> {}
-  impl <U> LtU32 for U where U : LeEqU32 + typenum::IsLess <U32, Output=True> {}
-  impl <U> LtU64 for U where U : LeEqU64 + typenum::IsLess <U64, Output=True> {}
-  impl <U> LtU128 for U where U : LeEqU128 + typenum::IsLess <U128, Output=True> {}
-}
-
-use self::traits::*;
 
 ////////////////////////////////////////////////////////////////////////////////
 //  unsigned
