@@ -299,7 +299,7 @@ mod tests {
         $(
         eprint!("{}", stringify!($fun_odd));
         )?
-        eprintln!()
+        eprintln!();
 
         $fun_even::<U0>(0.5, $unsigned::I32);
         $fun_even::<U0>(2.0, $unsigned::I32);
