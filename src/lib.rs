@@ -498,5 +498,70 @@ mod tests {
     test_unsigned_exhaustive!(U2F6, 1.0);
     test_unsigned_exhaustive!(U1F7, 1.0);
     test_unsigned_exhaustive!(U0F8, 1.0);
+
+    test_unsigned_exhaustive!(U16F0, 1.0);
+    test_unsigned_exhaustive!(U15F1, 1.0);
+    test_unsigned_exhaustive!(U14F2, 1.0);
+    test_unsigned_exhaustive!(U13F3, 1.0);
+    test_unsigned_exhaustive!(U12F4, 1.0);
+    test_unsigned_exhaustive!(U11F5, 1.0);
+    test_unsigned_exhaustive!(U10F6, 1.0);
+    test_unsigned_exhaustive!(U9F7,  1.0);
+    test_unsigned_exhaustive!(U8F8,  1.0);
+    test_unsigned_exhaustive!(U7F9,  1.0);
+    test_unsigned_exhaustive!(U6F10, 1.0);
+    test_unsigned_exhaustive!(U5F11, 1.0);
+    test_unsigned_exhaustive!(U4F12, 1.0);
+    test_unsigned_exhaustive!(U3F13, 1.0);
+    test_unsigned_exhaustive!(U2F14, 1.0);
+    test_unsigned_exhaustive!(U1F15, 1.0);
+    test_unsigned_exhaustive!(U0F16, 1.0);
+  }
+
+  #[test]
+  fn test_sqrt_signed_exhaustive() {
+    macro_rules! test_signed_exhaustive {
+      ($signed:ident, $maxerr:expr) => {
+        let mut i = $signed::from_bits (0);
+        loop {
+          let err = (i.to_num::<f64>().sqrt() - i.sqrt().to_num::<f64>()).abs();
+          if err >= $maxerr {
+            show!((stringify!($signed), i, i.sqrt(), err));
+            assert!(err < $maxerr);
+          }
+          if i == $signed::max_value() {
+            break
+          }
+          i += $signed::from_bits (1);
+        }
+      }
+    }
+    test_signed_exhaustive!(I8F0, 1.0);
+    test_signed_exhaustive!(I7F1, 1.0);
+    test_signed_exhaustive!(I6F2, 1.0);
+    test_signed_exhaustive!(I5F3, 1.0);
+    test_signed_exhaustive!(I4F4, 1.0);
+    test_signed_exhaustive!(I3F5, 1.0);
+    test_signed_exhaustive!(I2F6, 1.0);
+    test_signed_exhaustive!(I1F7, 1.0);
+    //test_signed_exhaustive!(I0F8, 1.0);   // unimplemented
+
+    test_signed_exhaustive!(I16F0, 1.0);
+    test_signed_exhaustive!(I15F1, 1.0);
+    test_signed_exhaustive!(I14F2, 1.0);
+    test_signed_exhaustive!(I13F3, 1.0);
+    test_signed_exhaustive!(I12F4, 1.0);
+    test_signed_exhaustive!(I11F5, 1.0);
+    test_signed_exhaustive!(I10F6, 1.0);
+    test_signed_exhaustive!(I9F7,  1.0);
+    test_signed_exhaustive!(I8F8,  1.0);
+    test_signed_exhaustive!(I7F9,  1.0);
+    test_signed_exhaustive!(I6F10, 1.0);
+    test_signed_exhaustive!(I5F11, 1.0);
+    test_signed_exhaustive!(I4F12, 1.0);
+    test_signed_exhaustive!(I3F13, 1.0);
+    test_signed_exhaustive!(I2F14, 1.0);
+    test_signed_exhaustive!(I1F15, 1.0);
+    //test_signed_exhaustive!(I0F16, 1.0);  // unimplemented
   }
 }
