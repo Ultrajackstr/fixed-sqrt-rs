@@ -57,7 +57,8 @@ use fixed::{FixedI8, FixedI16, FixedI32, FixedI64, FixedU8, FixedU16,
   FixedU32, FixedU64, FixedI128, FixedU128};
 use fixed::traits::Fixed;
 use fixed::types::extra::*;
-use integer_sqrt::IntegerSquareRoot;
+
+pub use integer_sqrt::IntegerSquareRoot;
 
 pub use FixedSqrtEven as FixedSqrt;
 
