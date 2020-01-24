@@ -52,7 +52,12 @@ macro_rules! bits8 {
   ($e:expr) => { println!("{}: {:08b}", stringify!($e), $e); }
 }
 
-use std::ops::{Rem, Shl};
+#[allow(unused_macros)]
+macro_rules! bits64 {
+  ($e:expr) => { println!("{}: {:064b}", stringify!($e), $e); }
+}
+
+use std::ops::Rem;
 use fixed::{FixedI8, FixedI16, FixedI32, FixedI64, FixedU8, FixedU16,
   FixedU32, FixedU64, FixedI128, FixedU128};
 use fixed::traits::Fixed;
@@ -66,14 +71,14 @@ pub use FixedSqrtEven as FixedSqrt;
 
 /// Square root algorithm for an even number of fractional bits
 pub trait FixedSqrtEven : Fixed where
-  Self::Bits : Shl <usize, Output=Self::Bits> + IntegerSquareRoot
+  Self::Bits : IntegerSquareRoot
 {
   fn sqrt (self) -> Self;
 }
 
 /// Square root algorithm for an odd number of fractional bits
 pub trait FixedSqrtOdd : Fixed where
-  Self::Bits : Shl <usize, Output=Self::Bits> + IntegerSquareRoot
+  Self::Bits : IntegerSquareRoot
 {
   fn sqrt (self) -> Self;
 }
@@ -143,7 +148,7 @@ impl_sqrt_unsigned_odd!(FixedU64,  LeEqU64,  u128);
 ////////////////////////////////////////////////////////////////////////////////
 
 macro_rules! impl_sqrt_signed_even {
-  ($signed:ident, $lt:ident) => {
+  ($signed:ident, $lt:ident, $unsigned:ty) => {
     impl <U> FixedSqrtEven for $signed <U> where
       U : $lt + Rem <U2>,
       typenum::Mod <U, U2> : typenum::Same <U0>
@@ -152,10 +157,13 @@ macro_rules! impl_sqrt_signed_even {
         if self.is_negative() {
           panic!("fixed point square root of a negative number");
         }
-        let n = $signed::from_bits(
-          self.to_bits().integer_sqrt() <<
-            (<$signed <U> as Fixed>::Frac::USIZE/2)
-        );
+        // NOTE: as of integer-sqrt v0.1.2 there seems to be a bug when
+        // computing sqrt using signed 32bit and 128bit integers, we can just
+        // use unsigned integers instead
+        let bits = self.to_bits() as $unsigned;
+        let sqrt = bits.integer_sqrt() <<
+          (<$signed <U> as Fixed>::Frac::USIZE/2);
+        let n = $signed::from_bits (sqrt as <$signed <U> as Fixed>::Bits);
         // NOTE: by excluding the case with zero integer bits, this assertion
         // should never fail
         debug_assert!(n.count_ones() == 0 || n.is_positive());
@@ -195,11 +203,11 @@ macro_rules! impl_sqrt_signed_odd {
   }
 }
 
-impl_sqrt_signed_even!(FixedI8,   LtU8);
-impl_sqrt_signed_even!(FixedI16,  LtU16);
-impl_sqrt_signed_even!(FixedI32,  LtU32);
-impl_sqrt_signed_even!(FixedI64,  LtU64);
-impl_sqrt_signed_even!(FixedI128, LtU128);
+impl_sqrt_signed_even!(FixedI8,   LtU8,   u8);
+impl_sqrt_signed_even!(FixedI16,  LtU16,  u16);
+impl_sqrt_signed_even!(FixedI32,  LtU32,  u32);
+impl_sqrt_signed_even!(FixedI64,  LtU64,  u64);
+impl_sqrt_signed_even!(FixedI128, LtU128, u128);
 impl_sqrt_signed_odd!(FixedI8,   LeEqU8,   u8);
 impl_sqrt_signed_odd!(FixedI16,  LeEqU16,  u16);
 impl_sqrt_signed_odd!(FixedI32,  LeEqU32,  u32);
@@ -456,6 +464,19 @@ mod tests {
   #[should_panic]
   fn test_sqrt_negative() {
     I16F16::from_num (-1.0).sqrt();
+  }
+
+  #[test]
+  fn test_sqrt_max() {
+    // test some misc max values
+    // NOTE: integer-sqrt v0.1.2 has a bug where these would fail for i32 and
+    // i128 types, so we changed the implementation to use unsigned instead of
+    // signed types
+    I4F4::max_value().sqrt();
+    I8F8::max_value().sqrt();
+    I16F16::max_value().sqrt();
+    I32F32::max_value().sqrt();
+    I64F64::max_value().sqrt();
   }
 
   #[test]
