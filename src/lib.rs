@@ -200,7 +200,8 @@ macro_rules! impl_sqrt_signed_odd {
         let sqrt =
           bits.integer_sqrt() << (<$signed <U> as Fixed>::Frac::USIZE/2);
         let n = $signed::from_bits (sqrt as <$signed <U> as Fixed>::Bits);
-        // NOTE: it should not be possible for this assertion to fail
+        // NOTE: by excluding the case with zero integer bits, this assertion
+        // should never fail
         debug_assert!(n.count_ones() == 0 || n.is_positive());
         n
       }
