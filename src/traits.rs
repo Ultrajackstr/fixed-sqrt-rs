@@ -1,9 +1,7 @@
-//! Additional and re-exported traits
+//! Additional traits
 
 use fixed::types::extra::*;
 use typenum::IsLess;
-
-pub use integer_sqrt::IntegerSquareRoot;
 
 pub trait LtU8   : LeEqU8   + IsLess <U8,   Output=True> {}
 pub trait LtU16  : LeEqU16  + IsLess <U16,  Output=True> {}

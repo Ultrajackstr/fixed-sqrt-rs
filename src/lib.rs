@@ -62,6 +62,7 @@ use fixed::{FixedI8, FixedI16, FixedI32, FixedI64, FixedU8, FixedU16,
   FixedU32, FixedU64, FixedI128, FixedU128};
 use fixed::traits::Fixed;
 use fixed::types::extra::*;
+use integer_sqrt::IntegerSquareRoot;
 
 pub mod traits;
 
@@ -70,16 +71,12 @@ use self::traits::*;
 pub use FixedSqrtEven as FixedSqrt;
 
 /// Square root algorithm for an even number of fractional bits
-pub trait FixedSqrtEven : Fixed where
-  Self::Bits : IntegerSquareRoot
-{
+pub trait FixedSqrtEven : Fixed {
   fn sqrt (self) -> Self;
 }
 
 /// Square root algorithm for an odd number of fractional bits
-pub trait FixedSqrtOdd : Fixed where
-  Self::Bits : IntegerSquareRoot
-{
+pub trait FixedSqrtOdd : Fixed {
   fn sqrt (self) -> Self;
 }
 

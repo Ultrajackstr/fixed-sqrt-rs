@@ -1,14 +1,10 @@
 extern crate clap;
 extern crate fixed;
 extern crate fixed_sqrt;
-extern crate integer_sqrt;
 
 use fixed::types::*;
-use fixed::types::extra::Unsigned;
 use fixed::traits::Fixed;
 use fixed_sqrt::{FixedSqrtEven, FixedSqrtOdd};
-
-//use integer_sqrt::IntegerSquareRoot;
 
 macro_rules! show {
   ($e:expr) => { println!("{}: {:?}", stringify!($e), $e); }
@@ -112,12 +108,6 @@ fn main() {
       let mut count = 0;
       loop {
         let fixed   = i;
-        if <$signed as Fixed>::Frac::USIZE ==
-          8 * std::mem::size_of::<<$signed as Fixed>::Bits>() &&
-          fixed >= $signed::from_num (0.25)
-        {
-          break
-        }
         count += 1;
         let sqrt    = fixed.sqrt();
         let exact   = fixed.to_num::<f64>().sqrt();
@@ -171,7 +161,7 @@ fn main() {
   exhaustive_signed!(I3F5);
   exhaustive_signed!(I2F6);
   exhaustive_signed!(I1F7);
-  //exhaustive_signed!(I0F8);
+  //exhaustive_signed!(I0F8);   // unimplemented
 
   exhaustive_unsigned!(U16F0);
   exhaustive_unsigned!(U15F1);
@@ -207,7 +197,7 @@ fn main() {
   exhaustive_signed!(I3F13);
   exhaustive_signed!(I2F14);
   exhaustive_signed!(I1F15);
-  //exhaustive_signed!(I0F16);
+  //exhaustive_signed!(I0F16);  // unimplemented
 
   println!("...errors main");
 }
