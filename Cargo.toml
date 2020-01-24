@@ -11,3 +11,6 @@ fixed = "0.5.*"
 integer-sqrt = "0.1.*"
 lazy_static = "1.*"
 typenum = "1.*"
+
+[dev-dependencies]
+clap = "2.*"

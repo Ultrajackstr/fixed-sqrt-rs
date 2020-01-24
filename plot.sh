@@ -1,5 +1,12 @@
 #!/bin/sh
 
+set -x
+set -e
+
+cargo run --example errors -- -p
+
+set +x
+
 for file in *.csv; do
   name=$(basename -s .csv $file)
   echo "

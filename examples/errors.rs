@@ -1,3 +1,4 @@
+extern crate clap;
 extern crate fixed;
 extern crate fixed_sqrt;
 extern crate integer_sqrt;
@@ -31,14 +32,24 @@ fn main() {
   use std::io::Write;
   println!("errors main...");
 
+  let opts = clap::App::new ("FixedSqrt Errors Example")
+    .arg (clap::Arg::with_name ("plot-csv")
+      .short ("p")
+      .help ("Dump actual vs computed sqrts to CSV for plotting"))
+    .get_matches();
+
   macro_rules! exhaustive_unsigned {
     ($unsigned:ident) => {
       println!("{}", std::iter::repeat ('~').take (80).collect::<String>());
       show!($unsigned::min_value());
       show!($unsigned::max_value());
-      let mut file        = std::fs::File::create (
-        format!("{}.csv", stringify!($unsigned))).unwrap();
-      //file.write ("fixed,exact,sqrt\n".as_bytes()).unwrap();
+      let mut file = if opts.occurrences_of ("plot-csv") > 0 {
+        Some (std::fs::File::create (
+          format!("{}.csv", stringify!($unsigned))).unwrap())
+      } else {
+        None
+      };
+      let mut avg_err_abs = 0.0;
       let mut avg_err_pct = 0.0;
       let mut max_err_abs = MaxErr::default();
       let mut max_err_pct = MaxErr::default();
@@ -51,12 +62,15 @@ fn main() {
         let exact   = fixed.to_num::<f64>().sqrt();
         let err_abs = (exact - sqrt.to_num::<f64>()).abs();
         let err_pct = if exact == 0.0 {
+          assert!(err_abs == 0.0);
           0.0
         } else {
           err_abs / exact
         };
-        file.write (format!("{},{},{}\n", fixed, exact, sqrt).as_bytes())
-          .unwrap();
+        file.as_mut().map (|file|
+          file.write (format!("{},{},{}\n", fixed, exact, sqrt).as_bytes())
+            .unwrap());
+        avg_err_abs += err_abs;
         avg_err_pct += err_pct;
         if err_abs > max_err_abs.err_abs {
           max_err_abs = MaxErr { fixed, sqrt, exact, err_abs, err_pct };
@@ -70,9 +84,11 @@ fn main() {
         i += $unsigned::from_bits (1);
       }
       show!(count);
+      avg_err_abs = avg_err_abs / count as f64;
       avg_err_pct = avg_err_pct / count as f64;
       show!(max_err_abs);
       show!(max_err_pct);
+      show!(avg_err_abs);
       show!(avg_err_pct);
     }
   }
@@ -82,9 +98,13 @@ fn main() {
       println!("{}", std::iter::repeat ('~').take (80).collect::<String>());
       show!($signed::min_value());
       show!($signed::max_value());
-      let mut file        = std::fs::File::create (
-        format!("{}.csv", stringify!($signed))).unwrap();
-      //file.write ("fixed,exact,sqrt\n".as_bytes()).unwrap();
+      let mut file = if opts.occurrences_of ("plot-csv") > 0 {
+        Some (std::fs::File::create (
+          format!("{}.csv", stringify!($signed))).unwrap())
+      } else {
+        None
+      };
+      let mut avg_err_abs = 0.0;
       let mut avg_err_pct = 0.0;
       let mut max_err_abs = MaxErr::default();
       let mut max_err_pct = MaxErr::default();
@@ -92,12 +112,6 @@ fn main() {
       let mut count = 0;
       loop {
         let fixed   = i;
-        if <$signed as Fixed>::Frac::USIZE ==
-          8 * std::mem::size_of::<<$signed as Fixed>::Bits>() - 1 &&
-          fixed >= $signed::from_num (0.5)
-        {
-          break
-        }
         if <$signed as Fixed>::Frac::USIZE ==
           8 * std::mem::size_of::<<$signed as Fixed>::Bits>() &&
           fixed >= $signed::from_num (0.25)
@@ -113,8 +127,10 @@ fn main() {
         } else {
           err_abs / exact
         };
-        file.write (format!("{},{},{}\n", fixed, exact, sqrt).as_bytes())
-          .unwrap();
+        file.as_mut().map (|file|
+          file.write (format!("{},{},{}\n", fixed, exact, sqrt).as_bytes())
+            .unwrap());
+        avg_err_abs += err_abs;
         avg_err_pct += err_pct;
         if err_abs > max_err_abs.err_abs {
           max_err_abs = MaxErr { fixed, sqrt, exact, err_abs, err_pct };
@@ -128,9 +144,11 @@ fn main() {
         i += $signed::from_bits (1);
       }
       show!(count);
+      avg_err_abs = avg_err_abs / count as f64;
       avg_err_pct = avg_err_pct / count as f64;
       show!(max_err_abs);
       show!(max_err_pct);
+      show!(avg_err_abs);
       show!(avg_err_pct);
     }
   }
@@ -153,7 +171,7 @@ fn main() {
   exhaustive_signed!(I3F5);
   exhaustive_signed!(I2F6);
   exhaustive_signed!(I1F7);
-  exhaustive_signed!(I0F8);
+  //exhaustive_signed!(I0F8);
 
   exhaustive_unsigned!(U16F0);
   exhaustive_unsigned!(U15F1);
@@ -189,7 +207,7 @@ fn main() {
   exhaustive_signed!(I3F13);
   exhaustive_signed!(I2F14);
   exhaustive_signed!(I1F15);
-  exhaustive_signed!(I0F16);
+  //exhaustive_signed!(I0F16);
 
   println!("...errors main");
 }
