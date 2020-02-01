@@ -7,7 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-fixed = { version = "0.5.*", git = "https://gitlab.com/spearman/fixed.git", branch = "serdeize-wrapping" }
+fixed = { version = "0.5.*", git = "https://gitlab.com/tspiteri/fixed.git" }
 integer-sqrt = "0.1.*"
 typenum = "1.*"
 
