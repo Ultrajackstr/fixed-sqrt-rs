@@ -8,33 +8,36 @@ defined in the [`fixed`](https://crates.io/crates/fixed) crate, using the
 integer square root algorithm provided by the
 [`integer-sqrt`](https://crates.io/crates/integer-sqrt) crate.
 
-## Traits
+## Implementation
 
-The square root functionality is split into two traits: `FixedSqrtEven`
-(re-exported as `FixedSqrt`) and `FixedSqrtOdd`. This is because the square root
-algorithm needs to be specialized for an odd number of fractional bits
-(represented as a `typenum` parameter), and generic trait impls don't allow this
-kind of specialization based on mutually exclusive traits.
+**Even fractional bits**
 
-Computing the square root with an odd number of fractional bits requires one
-extra bit to shift into before performing the square root. Since square root
-is defined only for positive numbers, this can be done for all *signed*
-fixed-point numbers (up to and including `FixedI128`) utilizing the sign bit
-for the overflow.
+`FixedSqrt` is implemented for all *unsigned* fixed-point types with an *even*
+number of bits.
 
-For *unsigned* fixed-point numbers with odd fractional bits, if an extra bit
-is needed (i.e. if the MSB is 1), this requires a scalar cast to the next
-larger unsigned primitive type before computing the square root. As a
-result, the square root trait is *not* implemented for `FixedU128` with an
-*odd* number fractional bits since that would require 256-bit unsigned
-integers, or else the domain would have to be restricted to the lower half
-of u128 values.
+`FixedSqrt` is implemented for all *signed* fixed-point types with an even
+number of fractional bits, *except* for the case of *zero integer* bits (i.e.
+fractional bits equal to the total bit size of the type). This is because the
+range for these types is *[-0.5, 0.5)*, and square roots of numbers in the range
+*[0.25, 0.5)* will be *>= 0.5*, outside of the range of representable values for
+that type.
 
-Square root is also *not* implemented for *signed* fixed-point types with
-*zero integer* bits (i.e. fractional bits equal to the total bit size of the
-type). This is because the range for these types is *[-0.5, 0.5)*, and
-square roots of numbers in the range *[0.25, 0.5)* will be *>= 0.5*, outside
-of the range of representable values for that type.
+**Odd fractional bits**
+
+Computing the square root with an *odd* number of fractional bits requires one
+extra bit to shift before performing the square root.
+
+In the case of *signed* fixed-point numbers, since square root is defined only
+for positive input values, all signed fixed-point numbers (up to and including
+`FixedI128`) can compute the square root *in-place* utilizing the sign bit for
+the overflow.
+
+For *unsigned* fixed-point numbers with odd fractional bits, if an extra bit is
+needed (i.e. if the most significant bit is 1), this requires a scalar cast to
+the next larger unsigned primitive type before computing the square root. As a
+result, the square root trait is *not* implemented for `FixedU128` types with an
+odd number fractional bits since that would require 256-bit unsigned integers,
+or else the domain would have to be restricted to the lower half of u128 values.
 
 ## Accuracy
 

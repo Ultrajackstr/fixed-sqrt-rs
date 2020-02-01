@@ -1,6 +1,6 @@
 [package]
 name = "fixed-sqrt"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Shane Pearman <spearman@gitlab.com>"]
 edition = "2018"
 

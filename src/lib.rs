@@ -1,31 +1,39 @@
-//! Square root trait for fixed-point numbers using integer square root
-//! algorithm.
+//! Square root trait for [fixed-point numbers](https://docs.rs/fixed) using
+//! [integer square root](https://docs.rs/integer-sqrt) algorithm.
 //!
-//! This functionality is split into two traits: `FixedSqrtEven` (re-exported as
-//! `FixedSqrt`) and `FixedSqrtOdd`. This is because the square root algorithm
-//! needs to be specialized for an odd number of fractional bits (represented as
-//! a `typenum` parameter), and generic trait impls don't allow this kind of
-//! specialization based on mutually exclusive traits.
+//! [Repository](https://gitlab.com/spearman/fixed-sqrt-rs)
 //!
-//! Computing the square root with an odd number of fractional bits requires one
-//! extra bit to shift into before performing the square root. Since square root
-//! is defined only for positive numbers, this can be done for all *signed*
-//! fixed-point numbers (up to and including `FixedI128`) utilizing the sign bit
-//! for the overflow.
+//! # Implementation
+//!
+//! **Even fractional bits**
+//!
+//! `FixedSqrt` is implemented for all *unsigned* fixed-point types with an
+//! *even* number of bits.
+//!
+//! `FixedSqrt` is implemented for all *signed* fixed-point types with an even
+//! number of fractional bits, *except* for the case of *zero integer* bits
+//! (i.e. fractional bits equal to the total bit size of the type). This is
+//! because the range for these types is *[-0.5, 0.5)*, and square roots of
+//! numbers in the range *[0.25, 0.5)* will be *>= 0.5*, outside of the range of
+//! representable values for that type.
+//!
+//! **Odd fractional bits**
+//!
+//! Computing the square root with an *odd* number of fractional bits requires
+//! one extra bit to shift before performing the square root.
+//!
+//! In the case of *signed* fixed-point numbers, since square root is defined
+//! only for positive input values, all signed fixed-point numbers (up to and
+//! including `FixedI128`) can compute the square root *in-place* utilizing the
+//! sign bit for the overflow.
 //!
 //! For *unsigned* fixed-point numbers with odd fractional bits, if an extra bit
-//! is needed (i.e. if the MSB is 1), this requires a scalar cast to the next
-//! larger unsigned primitive type before computing the square root. As a
-//! result, the square root trait is *not* implemented for `FixedU128` with an
-//! *odd* number fractional bits since that would require 256-bit unsigned
-//! integers, or else the domain would have to be restricted to the lower half
-//! of u128 values.
-//!
-//! Square root is also *not* implemented for *signed* fixed-point types with
-//! *zero integer* bits (i.e. fractional bits equal to the total bit size of the
-//! type). This is because the range for these types is *[-0.5, 0.5)*, and
-//! square roots of numbers in the range *[0.25, 0.5)* will be *>= 0.5*, outside
-//! of the range of representable values for that type.
+//! is needed (i.e. if the most significant bit is 1), this requires a scalar
+//! cast to the next larger unsigned primitive type before computing the square
+//! root. As a result, the square root trait is *not* implemented for
+//! `FixedU128` types with an odd number fractional bits since that would
+//! require 256-bit unsigned integers, or else the domain would have to be
+//! restricted to the lower half of u128 values.
 //!
 //! # Accuracy
 //!
@@ -57,26 +65,20 @@ macro_rules! bits64 {
   ($e:expr) => { println!("{}: {:064b}", stringify!($e), $e); }
 }
 
-use std::ops::Rem;
-use fixed::{FixedI8, FixedI16, FixedI32, FixedI64, FixedU8, FixedU16,
-  FixedU32, FixedU64, FixedI128, FixedU128};
+use fixed::{FixedI8, FixedI16, FixedI32, FixedI64, FixedU8, FixedU16, FixedU32,
+  FixedU64, FixedI128, FixedU128};
 use fixed::traits::Fixed;
 use fixed::types::extra::*;
 use integer_sqrt::IntegerSquareRoot;
+use typenum::{UInt, UTerm};
+use typenum::bit::{B0, B1};
 
 pub mod traits;
 
 use self::traits::*;
 
-pub use FixedSqrtEven as FixedSqrt;
-
-/// Square root algorithm for an even number of fractional bits
-pub trait FixedSqrtEven : Fixed {
-  fn sqrt (self) -> Self;
-}
-
-/// Square root algorithm for an odd number of fractional bits
-pub trait FixedSqrtOdd : Fixed {
+/// Square root algorithm for fixed-point numbers
+pub trait FixedSqrt : Fixed {
   fn sqrt (self) -> Self;
 }
 
@@ -86,14 +88,21 @@ pub trait FixedSqrtOdd : Fixed {
 
 macro_rules! impl_sqrt_unsigned_even {
   ($unsigned:ident, $lt:ident) => {
-    impl <U> FixedSqrtEven for $unsigned <U> where
-      U : $lt + Rem <U2>,
-      typenum::Mod <U, U2> : typenum::Same <U0>
+    impl FixedSqrt for $unsigned <UTerm> {
+      fn sqrt (self) -> Self {
+        $unsigned::from_bits (
+          self.to_bits().integer_sqrt() <<
+            (<$unsigned <UTerm> as Fixed>::Frac::USIZE/2)
+        )
+      }
+    }
+    impl <U> FixedSqrt for $unsigned <UInt <U, B0>> where
+      UInt <U, B0> : $lt
     {
       fn sqrt (self) -> Self {
         $unsigned::from_bits (
           self.to_bits().integer_sqrt() <<
-            (<$unsigned <U> as Fixed>::Frac::USIZE/2)
+            (<$unsigned <UInt <U, B0>> as Fixed>::Frac::USIZE/2)
         )
       }
     }
@@ -102,26 +111,25 @@ macro_rules! impl_sqrt_unsigned_even {
 
 macro_rules! impl_sqrt_unsigned_odd {
   ($unsigned:ident, $leq:ident, $higher:ty) => {
-    impl <U> FixedSqrtOdd for $unsigned <U> where
-      U : $leq + Rem <U2>,
-      typenum::Mod <U, U2> : typenum::Same <U1>
+    impl <U> FixedSqrt for $unsigned <UInt <U, B1>> where
+      UInt <U, B1> : $leq
     {
       fn sqrt (self) -> Self {
         let bits = self.to_bits();
         let sqrt = if
-          bits & (1 as <$unsigned <U> as Fixed>::Bits).rotate_right (1) > 0
+          bits & (1 as <$unsigned <UInt <U, B1>> as Fixed>::Bits).rotate_right (1) > 0
         {
           // NOTE: we compute on the unsigned integer type of the larger size
           let bits = bits as $higher << 1;
-          let sqrt =
-            bits.integer_sqrt() << (<$unsigned <U> as Fixed>::Frac::USIZE/2);
+          let sqrt = bits.integer_sqrt() << (<$unsigned <UInt <U, B1>>
+            as Fixed>::Frac::USIZE/2);
           // square root should be within max value
-          debug_assert!(sqrt <= <$unsigned <U> as Fixed>::Bits::max_value()
-            as $higher);
-          sqrt as <$unsigned <U> as Fixed>::Bits
+          debug_assert!(sqrt <=
+            <$unsigned <UInt <U, B1>> as Fixed>::Bits::max_value() as $higher);
+          sqrt as <$unsigned <UInt <U, B1>> as Fixed>::Bits
         } else {
           let bits = bits << 1;
-          bits.integer_sqrt() << (<$unsigned <U> as Fixed>::Frac::USIZE/2)
+          bits.integer_sqrt() << (<$unsigned <UInt <U, B1>> as Fixed>::Frac::USIZE/2)
         };
         $unsigned::from_bits (sqrt)
       }
@@ -146,9 +154,27 @@ impl_sqrt_unsigned_odd!(FixedU64,  LeEqU64,  u128);
 
 macro_rules! impl_sqrt_signed_even {
   ($signed:ident, $lt:ident, $unsigned:ty) => {
-    impl <U> FixedSqrtEven for $signed <U> where
-      U : $lt + Rem <U2>,
-      typenum::Mod <U, U2> : typenum::Same <U0>
+    impl FixedSqrt for $signed <UTerm> {
+      fn sqrt (self) -> Self {
+        if self.is_negative() {
+          panic!("fixed point square root of a negative number");
+        }
+        // NOTE: as of integer-sqrt v0.1.2 there seems to be a bug when
+        // computing sqrt using signed 32bit and 128bit integers, we can just
+        // use unsigned integers instead
+        let bits = self.to_bits() as $unsigned;
+        let sqrt = bits.integer_sqrt() <<
+          (<$signed <UTerm> as Fixed>::Frac::USIZE/2);
+        let n = $signed::from_bits (sqrt as <$signed <UTerm> as Fixed>::Bits);
+        // NOTE: by excluding the case with zero integer bits, this assertion
+        // should never fail
+        debug_assert!(n.count_ones() == 0 || n.is_positive());
+        n
+      }
+    }
+
+    impl <U> FixedSqrt for $signed <UInt <U, B0>> where
+      UInt <U, B0> : $lt
     {
       fn sqrt (self) -> Self {
         if self.is_negative() {
@@ -159,8 +185,9 @@ macro_rules! impl_sqrt_signed_even {
         // use unsigned integers instead
         let bits = self.to_bits() as $unsigned;
         let sqrt = bits.integer_sqrt() <<
-          (<$signed <U> as Fixed>::Frac::USIZE/2);
-        let n = $signed::from_bits (sqrt as <$signed <U> as Fixed>::Bits);
+          (<$signed <UInt <U, B0>> as Fixed>::Frac::USIZE/2);
+        let n = $signed::from_bits (sqrt
+          as <$signed <UInt <U, B0>> as Fixed>::Bits);
         // NOTE: by excluding the case with zero integer bits, this assertion
         // should never fail
         debug_assert!(n.count_ones() == 0 || n.is_positive());
@@ -172,9 +199,8 @@ macro_rules! impl_sqrt_signed_even {
 
 macro_rules! impl_sqrt_signed_odd {
   ($signed:ident, $leq:ident, $unsigned:ty) => {
-    impl <U> FixedSqrtOdd for $signed <U> where
-      U : $leq + Rem <U2>,
-      typenum::Mod <U, U2> : typenum::Same <U1>
+    impl <U> FixedSqrt for $signed <UInt <U, B1>> where
+      UInt <U, B1> : $leq
     {
       fn sqrt (self) -> Self {
         if self.is_negative() {
@@ -184,14 +210,16 @@ macro_rules! impl_sqrt_signed_odd {
         // safe to shift, but we need to compute the square root on the unsigned
         // integer type
         debug_assert_eq!(
-          self.to_bits() & (1 as <$signed <U> as Fixed>::Bits).rotate_right (1),
+          self.to_bits() &
+            (1 as <$signed <UInt <U, B1>> as Fixed>::Bits).rotate_right (1),
           0x0);
         // NOTE: we compute on the unsigned integer type of the same size since
         // the sign bit is zero we can shift into it
         let bits = (self.to_bits() << 1) as $unsigned;
-        let sqrt =
-          bits.integer_sqrt() << (<$signed <U> as Fixed>::Frac::USIZE/2);
-        let n = $signed::from_bits (sqrt as <$signed <U> as Fixed>::Bits);
+        let sqrt = bits.integer_sqrt() <<
+          (<$signed <UInt <U, B1>> as Fixed>::Frac::USIZE/2);
+        let n = $signed::from_bits (sqrt
+          as <$signed <UInt <U, B1>> as Fixed>::Bits);
         // NOTE: this should never fail for odd fractional bits
         debug_assert!(n.count_ones() == 0 || n.is_positive());
         n
@@ -220,7 +248,7 @@ mod tests {
   use super::*;
   use fixed::types::*;
   //use fixed::types::extra::*;
-  use typenum::Sub1;
+  use typenum::{Shright, Sub1};
 
   #[test]
   fn test_sqrt() {
@@ -228,30 +256,58 @@ mod tests {
     assert_eq!(x.sqrt(), I16F16::from_num (1.41406));
 
     macro_rules! test_sqrt_unsigned {
-      ( $fun_even:ident, $(($fun_odd:ident),)? $fixed:ident, $unsigned:ident,
-        $maxerr:expr
+      ( $fun_zero:ident, $fun_even:ident, $(($fun_odd:ident),)? $fixed:ident,
+        $unsigned:ident, $maxerr:expr
       ) => {
-        fn $fun_even<U>(base: f64, range: i32) where
-          U : Unsigned + IsLessOrEqual<$unsigned, Output = True> + Rem <U2>,
-          typenum::Mod <U, U2> : typenum::Same <U0>
-        {
+        fn $fun_zero (base: f64, range: i32) {
           for i in 0..range {
             let h_f64 = base.powi(i);
             let l_f64 = base.powi(-i);
-            if let Some (h) = $fixed::<U>::checked_from_num(h_f64) {
+            if let Some (h) = $fixed::<U0>::checked_from_num(h_f64) {
               let h_sqrt = h.sqrt();
               let err = (h_f64.sqrt() - h_sqrt.to_num::<f64>()).abs();
               if err > $maxerr {
-                let ftype = format!("{}<U{}>", stringify!($fixed), U::USIZE);
+                let ftype = format!("{}<U{}>",
+                  stringify!($fixed), <U0>::USIZE);
                 show!((ftype, h, h_sqrt, err));
                 assert!(err <= $maxerr);
               }
             }
-            if let Some (l) = $fixed::<U>::checked_from_num(l_f64) {
+            if let Some (l) = $fixed::<U0>::checked_from_num(l_f64) {
               let l_sqrt = l.sqrt();
               let err = (l_f64.sqrt() - l_sqrt.to_num::<f64>()).abs();
               if err > $maxerr {
-                let ftype = format!("{}<U{}>", stringify!($fixed), U::USIZE);
+                let ftype = format!("{}<U{}>",
+                  stringify!($fixed), <U0>::USIZE);
+                show!((ftype, l, l_sqrt, err));
+                assert!(err <= $maxerr);
+              }
+            }
+          }
+        }
+
+        fn $fun_even<U>(base: f64, range: i32) where
+          UInt <U, B0> : Unsigned + IsLessOrEqual<$unsigned, Output = True>
+        {
+          for i in 0..range {
+            let h_f64 = base.powi(i);
+            let l_f64 = base.powi(-i);
+            if let Some (h) = $fixed::<UInt <U, B0>>::checked_from_num(h_f64) {
+              let h_sqrt = h.sqrt();
+              let err = (h_f64.sqrt() - h_sqrt.to_num::<f64>()).abs();
+              if err > $maxerr {
+                let ftype = format!("{}<U{}>",
+                  stringify!($fixed), <UInt <U, B0>>::USIZE);
+                show!((ftype, h, h_sqrt, err));
+                assert!(err <= $maxerr);
+              }
+            }
+            if let Some (l) = $fixed::<UInt <U, B0>>::checked_from_num(l_f64) {
+              let l_sqrt = l.sqrt();
+              let err = (l_f64.sqrt() - l_sqrt.to_num::<f64>()).abs();
+              if err > $maxerr {
+                let ftype = format!("{}<U{}>",
+                  stringify!($fixed), <UInt <U, B0>>::USIZE);
                 show!((ftype, l, l_sqrt, err));
                 assert!(err <= $maxerr);
               }
@@ -260,26 +316,27 @@ mod tests {
         }
         $(
         fn $fun_odd<U>(base: f64, range: i32) where
-          U : Unsigned + IsLessOrEqual<$unsigned, Output = True> + Rem <U2>,
-          typenum::Mod <U, U2> : typenum::Same <U1>
+          UInt <U, B1> : Unsigned + IsLessOrEqual<$unsigned, Output = True>
         {
           for i in 0..range {
             let h_f64 = base.powi(i);
             let l_f64 = base.powi(-i);
-            if let Some (h) = $fixed::<U>::checked_from_num(h_f64) {
+            if let Some (h) = $fixed::<UInt <U, B1>>::checked_from_num(h_f64) {
               let h_sqrt = h.sqrt();
               let err = (h_f64.sqrt() - h_sqrt.to_num::<f64>()).abs();
               if err > $maxerr {
-                let ftype = format!("{}<U{}>", stringify!($fixed), U::USIZE);
+                let ftype = format!("{}<U{}>",
+                  stringify!($fixed), <UInt <U, B1>>::USIZE);
                 show!((ftype, h, h_sqrt, err));
                 assert!(err <= $maxerr);
               }
             }
-            if let Some (l) = $fixed::<U>::checked_from_num(l_f64) {
+            if let Some (l) = $fixed::<UInt <U, B1>>::checked_from_num(l_f64) {
               let l_sqrt = l.sqrt();
               let err = (l_f64.sqrt() - l_sqrt.to_num::<f64>()).abs();
               if err > $maxerr {
-                let ftype = format!("{}<U{}>", stringify!($fixed), U::USIZE);
+                let ftype = format!("{}<U{}>",
+                  stringify!($fixed), <UInt <U, B1>>::USIZE);
                 show!((ftype, l, l_sqrt, err));
                 assert!(err <= $maxerr);
               }
@@ -293,6 +350,12 @@ mod tests {
         )?
         eprintln!();
 
+        $fun_zero (0.5, $unsigned::I32);
+        $fun_zero (2.0, $unsigned::I32);
+        $fun_zero (2.5, $unsigned::I32/2);
+        $fun_zero (3.0, $unsigned::I32/2);
+        $fun_zero (5.0, $unsigned::I32/2);
+
         $fun_even::<U0>(0.5, $unsigned::I32);
         $fun_even::<U0>(2.0, $unsigned::I32);
         $fun_even::<U0>(2.5, $unsigned::I32/2);
@@ -313,68 +376,105 @@ mod tests {
         $fun_even::<U2>(3.0, $unsigned::I32/2);
         $fun_even::<U2>(5.0, $unsigned::I32/2);
 
-        $fun_even::<Sub1<Sub1<$unsigned>>>(0.5, $unsigned::I32);
-        $fun_even::<Sub1<Sub1<$unsigned>>>(2.0, $unsigned::I32);
-        $fun_even::<Sub1<Sub1<$unsigned>>>(2.5, $unsigned::I32/2);
-        $fun_even::<Sub1<Sub1<$unsigned>>>(3.0, $unsigned::I32/2);
-        $fun_even::<Sub1<Sub1<$unsigned>>>(5.0, $unsigned::I32/2);
+        $fun_even::<Shright<Sub1<Sub1<$unsigned>>,U1>>(0.5, $unsigned::I32);
+        $fun_even::<Shright<Sub1<Sub1<$unsigned>>,U1>>(2.0, $unsigned::I32);
+        $fun_even::<Shright<Sub1<Sub1<$unsigned>>,U1>>(2.5, $unsigned::I32/2);
+        $fun_even::<Shright<Sub1<Sub1<$unsigned>>,U1>>(3.0, $unsigned::I32/2);
+        $fun_even::<Shright<Sub1<Sub1<$unsigned>>,U1>>(5.0, $unsigned::I32/2);
 
         $(
-        $fun_odd::<Sub1<$unsigned>>(0.5, $unsigned::I32);
-        $fun_odd::<Sub1<$unsigned>>(2.0, $unsigned::I32);
-        $fun_odd::<Sub1<$unsigned>>(2.5, $unsigned::I32/2);
-        $fun_odd::<Sub1<$unsigned>>(3.0, $unsigned::I32/2);
-        $fun_odd::<Sub1<$unsigned>>(5.0, $unsigned::I32/2);
+        $fun_odd::<Shright<Sub1<$unsigned>,U1>>(0.5, $unsigned::I32);
+        $fun_odd::<Shright<Sub1<$unsigned>,U1>>(2.0, $unsigned::I32);
+        $fun_odd::<Shright<Sub1<$unsigned>,U1>>(2.5, $unsigned::I32/2);
+        $fun_odd::<Shright<Sub1<$unsigned>,U1>>(3.0, $unsigned::I32/2);
+        $fun_odd::<Shright<Sub1<$unsigned>,U1>>(5.0, $unsigned::I32/2);
         )?
 
-        $fun_even::<$unsigned>(0.5, $unsigned::I32);
-        $fun_even::<$unsigned>(2.0, $unsigned::I32);
-        $fun_even::<$unsigned>(2.5, $unsigned::I32/2);
-        $fun_even::<$unsigned>(3.0, $unsigned::I32/2);
-        $fun_even::<$unsigned>(5.0, $unsigned::I32/2);
+        $fun_even::<Shright<$unsigned,U1>>(0.5, $unsigned::I32);
+        $fun_even::<Shright<$unsigned,U1>>(2.0, $unsigned::I32);
+        $fun_even::<Shright<$unsigned,U1>>(2.5, $unsigned::I32/2);
+        $fun_even::<Shright<$unsigned,U1>>(3.0, $unsigned::I32/2);
+        $fun_even::<Shright<$unsigned,U1>>(5.0, $unsigned::I32/2);
       }
     }
 
-    test_sqrt_unsigned!(test_sqrt_u128_even, FixedU128, U128, 8.0);
-    test_sqrt_unsigned!(test_sqrt_u64_even, (test_sqrt_u64_odd), FixedU64, U64, 1.0);
-    test_sqrt_unsigned!(test_sqrt_u32_even, (test_sqrt_u32_odd), FixedU32, U32, 1.0);
-    test_sqrt_unsigned!(test_sqrt_u16_even, (test_sqrt_u16_odd), FixedU16, U16, 1.0);
-    test_sqrt_unsigned!(test_sqrt_u8_even,  (test_sqrt_u8_odd),  FixedU8,  U8,  1.0);
+    test_sqrt_unsigned!(test_sqrt_u128_zero, test_sqrt_u128_even, FixedU128,
+      U128, 8.0);
+    test_sqrt_unsigned!(test_sqrt_u64_zero, test_sqrt_u64_even,
+      (test_sqrt_u64_odd), FixedU64, U64, 1.0);
+    test_sqrt_unsigned!(test_sqrt_u32_zero, test_sqrt_u32_even,
+      (test_sqrt_u32_odd), FixedU32, U32, 1.0);
+    test_sqrt_unsigned!(test_sqrt_u16_zero, test_sqrt_u16_even,
+      (test_sqrt_u16_odd), FixedU16, U16, 1.0);
+    test_sqrt_unsigned!(test_sqrt_u8_zero, test_sqrt_u8_even,
+      (test_sqrt_u8_odd),  FixedU8,  U8,  1.0);
 
     macro_rules! test_sqrt_signed {
-      ( $fun_even:ident, $fun_odd:ident, $fixed:ident, $unsigned:ident,
-        $maxerr:expr
+      ( $fun_zero:ident, $fun_even:ident, $fun_odd:ident, $fixed:ident,
+        $unsigned:ident, $maxerr:expr
       ) => {
+        fn $fun_zero (base: f64, range: i32) {
+          for i in 0..range {
+            let h_f64 = base.powi(i);
+            let l_f64 = base.powi(-i);
+            if let Some (h) = $fixed::<U0>::checked_from_num(h_f64) {
+              let h_sqrt = h.sqrt();
+              let err = (h_f64.sqrt() - h_sqrt.to_num::<f64>()).abs();
+              if err > $maxerr {
+                let ftype = format!("{}<U{}>",
+                  stringify!($fixed), <U0>::USIZE);
+                show!((ftype, h, h_sqrt, err));
+                assert!(err <= $maxerr);
+              }
+            }
+            if let Some (l) = $fixed::<U0>::checked_from_num(l_f64) {
+              let l_sqrt = l.sqrt();
+              let err = (l_f64.sqrt() - l_sqrt.to_num::<f64>()).abs();
+              if err > $maxerr {
+                let ftype = format!("{}<U{}>",
+                  stringify!($fixed), <U0>::USIZE);
+                show!((ftype, l, l_sqrt, err));
+                assert!(err <= $maxerr);
+              }
+            }
+          }
+        }
+
         fn $fun_even<U>(base: f64, range: i32) where
-          U : Unsigned + typenum::IsLess <$unsigned, Output = True> +
-            IsLessOrEqual <$unsigned, Output = True> + Rem <U2>,
-          typenum::Mod <U, U2> : typenum::Same <U0>
+          UInt <U, B0> : Unsigned + typenum::IsLess <$unsigned, Output = True> +
+            IsLessOrEqual <$unsigned, Output = True>
         {
           for i in 0..range {
             let h_f64 = base.powi(i);
             let l_f64 = base.powi(-i);
-            if let Some (h) = $fixed::<U>::checked_from_num(h_f64) {
+            if let Some (h) = $fixed::<UInt <U, B0>>::checked_from_num(h_f64) {
               // skip out of range
-              if $fixed::<U>::checked_from_num(h_f64.sqrt()).is_none() {
+              if $fixed::<UInt <U, B0>>::checked_from_num(h_f64.sqrt())
+                .is_none()
+              {
                 continue
               }
               let h_sqrt = h.sqrt();
               let err = h_f64.sqrt() - h_sqrt.to_num::<f64>();
               if err > $maxerr {
-                let ftype = format!("{}<U{}>", stringify!($fixed), U::USIZE);
+                let ftype = format!("{}<U{}>",
+                  stringify!($fixed), <UInt <U, B0>>::USIZE);
                 show!((ftype, h, h_sqrt, err));
                 assert!(err <= $maxerr);
               }
             }
-            if let Some (l) = $fixed::<U>::checked_from_num(l_f64) {
+            if let Some (l) = $fixed::<UInt <U, B0>>::checked_from_num(l_f64) {
               // skip out of range
-              if $fixed::<U>::checked_from_num(l_f64.sqrt()).is_none() {
+              if $fixed::<UInt <U, B0>>::checked_from_num(l_f64.sqrt())
+                .is_none()
+              {
                 continue
               }
               let l_sqrt = l.sqrt();
               let err = l_f64.sqrt() - l_sqrt.to_num::<f64>();
               if err > $maxerr {
-                let ftype = format!("{}<U{}>", stringify!($fixed), U::USIZE);
+                let ftype = format!("{}<U{}>",
+                  stringify!($fixed), <UInt <U, B0>>::USIZE);
                 show!((ftype, l, l_sqrt, err));
                 assert!(err <= $maxerr);
               }
@@ -383,40 +483,51 @@ mod tests {
         }
 
         fn $fun_odd<U>(base: f64, range: i32) where
-          U : Unsigned + IsLessOrEqual<$unsigned, Output = True> + Rem <U2>,
-          typenum::Mod <U, U2> : typenum::Same <U1>
+          UInt <U, B1> : Unsigned + IsLessOrEqual<$unsigned, Output = True>
         {
           for i in 0..range {
             let h_f64 = base.powi(i);
             let l_f64 = base.powi(-i);
-            if let Some (h) = $fixed::<U>::checked_from_num(h_f64) {
+            if let Some (h) = $fixed::<UInt <U, B1>>::checked_from_num(h_f64) {
               // skip out of range
-              if $fixed::<U>::checked_from_num(h_f64.sqrt()).is_none() {
+              if $fixed::<UInt <U, B1>>::checked_from_num(h_f64.sqrt())
+                .is_none()
+              {
                 continue
               }
               let h_sqrt = h.sqrt();
               let err = h_f64.sqrt() - h_sqrt.to_num::<f64>();
               if err > $maxerr {
-                let ftype = format!("{}<U{}>", stringify!($fixed), U::USIZE);
+                let ftype = format!("{}<U{}>",
+                  stringify!($fixed), <UInt <U, B1>>::USIZE);
                 show!((ftype, h, h_sqrt, err));
                 assert!(err <= $maxerr);
               }
             }
-            if let Some (l) = $fixed::<U>::checked_from_num(l_f64) {
+            if let Some (l) = $fixed::<UInt <U, B1>>::checked_from_num(l_f64) {
               // skip out of range
-              if $fixed::<U>::checked_from_num(l_f64.sqrt()).is_none() {
+              if $fixed::<UInt <U, B1>>::checked_from_num(l_f64.sqrt())
+                .is_none()
+              {
                 continue
               }
               let l_sqrt = l.sqrt();
               let err = l_f64.sqrt() - l_sqrt.to_num::<f64>();
               if err > $maxerr {
-                let ftype = format!("{}<U{}>", stringify!($fixed), U::USIZE);
+                let ftype = format!("{}<U{}>",
+                  stringify!($fixed), <UInt <U, B1>>::USIZE);
                 show!((ftype, l, l_sqrt, err));
                 assert!(err <= $maxerr);
               }
             }
           }
         }
+
+        $fun_zero (0.5, $unsigned::I32);
+        $fun_zero (2.0, $unsigned::I32);
+        $fun_zero (2.5, $unsigned::I32/2);
+        $fun_zero (3.0, $unsigned::I32/2);
+        $fun_zero (5.0, $unsigned::I32/2);
 
         $fun_even::<U0>(0.5, $unsigned::I32);
         $fun_even::<U0>(2.0, $unsigned::I32);
@@ -436,25 +547,30 @@ mod tests {
         $fun_even::<U2>(3.0, $unsigned::I32/2);
         $fun_even::<U2>(5.0, $unsigned::I32/2);
 
-        $fun_even::<Sub1<Sub1<$unsigned>>>(0.5, $unsigned::I32);
-        $fun_even::<Sub1<Sub1<$unsigned>>>(2.0, $unsigned::I32);
-        $fun_even::<Sub1<Sub1<$unsigned>>>(2.5, $unsigned::I32/2);
-        $fun_even::<Sub1<Sub1<$unsigned>>>(3.0, $unsigned::I32/2);
-        $fun_even::<Sub1<Sub1<$unsigned>>>(5.0, $unsigned::I32/2);
+        $fun_even::<Shright<Sub1<Sub1<$unsigned>>,U1>>(0.5, $unsigned::I32);
+        $fun_even::<Shright<Sub1<Sub1<$unsigned>>,U1>>(2.0, $unsigned::I32);
+        $fun_even::<Shright<Sub1<Sub1<$unsigned>>,U1>>(2.5, $unsigned::I32/2);
+        $fun_even::<Shright<Sub1<Sub1<$unsigned>>,U1>>(3.0, $unsigned::I32/2);
+        $fun_even::<Shright<Sub1<Sub1<$unsigned>>,U1>>(5.0, $unsigned::I32/2);
 
-        $fun_odd::<Sub1<$unsigned>>(0.5, $unsigned::I32);
-        $fun_odd::<Sub1<$unsigned>>(2.0, $unsigned::I32);
-        $fun_odd::<Sub1<$unsigned>>(2.5, $unsigned::I32/2);
-        $fun_odd::<Sub1<$unsigned>>(3.0, $unsigned::I32/2);
-        $fun_odd::<Sub1<$unsigned>>(5.0, $unsigned::I32/2);
+        $fun_odd::<Shright<Sub1<$unsigned>,U1>>(0.5, $unsigned::I32);
+        $fun_odd::<Shright<Sub1<$unsigned>,U1>>(2.0, $unsigned::I32);
+        $fun_odd::<Shright<Sub1<$unsigned>,U1>>(2.5, $unsigned::I32/2);
+        $fun_odd::<Shright<Sub1<$unsigned>,U1>>(3.0, $unsigned::I32/2);
+        $fun_odd::<Shright<Sub1<$unsigned>,U1>>(5.0, $unsigned::I32/2);
       }
     }
 
-    test_sqrt_signed!(test_sqrt_i128_even, test_sqrt_i128_odd, FixedI128, U128, 8.0);
-    test_sqrt_signed!(test_sqrt_i64_even, test_sqrt_i64_odd, FixedI64, U64, 1.0);
-    test_sqrt_signed!(test_sqrt_i32_even, test_sqrt_i32_odd, FixedI32, U32, 1.0);
-    test_sqrt_signed!(test_sqrt_i16_even, test_sqrt_i16_odd, FixedI16, U16, 1.0);
-    test_sqrt_signed!(test_sqrt_i8_even,  test_sqrt_i8_odd,  FixedI8,  U8,  1.0);
+    test_sqrt_signed!(test_sqrt_i128_zero, test_sqrt_i128_even,
+      test_sqrt_i128_odd, FixedI128, U128, 8.0);
+    test_sqrt_signed!(test_sqrt_i64_zero, test_sqrt_i64_even, test_sqrt_i64_odd,
+      FixedI64, U64, 1.0);
+    test_sqrt_signed!(test_sqrt_i32_zero, test_sqrt_i32_even, test_sqrt_i32_odd,
+      FixedI32, U32, 1.0);
+    test_sqrt_signed!(test_sqrt_i16_zero, test_sqrt_i16_even, test_sqrt_i16_odd,
+      FixedI16, U16, 1.0);
+    test_sqrt_signed!(test_sqrt_i8_zero, test_sqrt_i8_even,  test_sqrt_i8_odd,
+      FixedI8,  U8,  1.0);
   }
 
   #[test]

@@ -4,7 +4,7 @@ extern crate fixed_sqrt;
 
 use fixed::types::*;
 use fixed::traits::Fixed;
-use fixed_sqrt::{FixedSqrtEven, FixedSqrtOdd};
+use fixed_sqrt::FixedSqrt;
 
 macro_rules! show {
   ($e:expr) => { println!("{}: {:?}", stringify!($e), $e); }
