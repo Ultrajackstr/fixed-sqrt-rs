@@ -2,12 +2,15 @@
 name = "fixed-sqrt"
 version = "0.2.0"
 authors = ["Shane Pearman <spearman@gitlab.com>"]
+license = "Apache-2.0"
+description = "Square root for fixed-point numbers"
+repository = "https://gitlab.com/spearman/fixed-sqrt-rs"
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-fixed = { version = "0.5.*", git = "https://gitlab.com/tspiteri/fixed.git" }
+fixed = "0.5.*"
 integer-sqrt = "0.1.*"
 typenum = "1.*"
 
