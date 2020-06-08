@@ -1,6 +1,6 @@
 [package]
 name = "fixed-sqrt"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Shane Pearman <spearman@gitlab.com>"]
 license = "Apache-2.0"
 description = "Square root for fixed-point numbers"
@@ -10,7 +10,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-fixed = "0.5.*"
+fixed = "1.*"
 integer-sqrt = "0.1.*"
 typenum = "1.*"
 

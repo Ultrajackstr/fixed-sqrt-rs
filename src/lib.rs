@@ -125,7 +125,7 @@ macro_rules! impl_sqrt_unsigned_odd {
             as Fixed>::Frac::USIZE/2);
           // square root should be within max value
           debug_assert!(sqrt <=
-            <$unsigned <UInt <U, B1>> as Fixed>::Bits::max_value() as $higher);
+            <$unsigned <UInt <U, B1>> as Fixed>::Bits::MAX as $higher);
           sqrt as <$unsigned <UInt <U, B1>> as Fixed>::Bits
         } else {
           let bits = bits << 1;
@@ -585,11 +585,11 @@ mod tests {
     // NOTE: integer-sqrt v0.1.2 has a bug where these would fail for i32 and
     // i128 types, so we changed the implementation to use unsigned instead of
     // signed types
-    I4F4::max_value().sqrt();
-    I8F8::max_value().sqrt();
-    I16F16::max_value().sqrt();
-    I32F32::max_value().sqrt();
-    I64F64::max_value().sqrt();
+    I4F4::MAX.sqrt();
+    I8F8::MAX.sqrt();
+    I16F16::MAX.sqrt();
+    I32F32::MAX.sqrt();
+    I64F64::MAX.sqrt();
   }
 
   #[test]
@@ -603,7 +603,7 @@ mod tests {
             show!((stringify!($unsigned), i, i.sqrt(), err));
             assert!(err < $maxerr);
           }
-          if i == $unsigned::max_value() {
+          if i == $unsigned::MAX {
             break
           }
           i += $unsigned::from_bits (1);
@@ -650,7 +650,7 @@ mod tests {
             show!((stringify!($signed), i, i.sqrt(), err));
             assert!(err < $maxerr);
           }
-          if i == $signed::max_value() {
+          if i == $signed::MAX {
             break
           }
           i += $signed::from_bits (1);

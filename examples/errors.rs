@@ -37,8 +37,8 @@ fn main() {
   macro_rules! exhaustive_unsigned {
     ($unsigned:ident) => {
       println!("{}", std::iter::repeat ('~').take (80).collect::<String>());
-      show!($unsigned::min_value());
-      show!($unsigned::max_value());
+      show!($unsigned::MIN);
+      show!($unsigned::MAX);
       let mut file = if opts.occurrences_of ("plot-csv") > 0 {
         Some (std::fs::File::create (
           format!("{}.csv", stringify!($unsigned))).unwrap())
@@ -74,7 +74,7 @@ fn main() {
         if err_pct > max_err_pct.err_pct {
           max_err_pct = MaxErr { fixed, sqrt, exact, err_abs, err_pct };
         }
-        if i == $unsigned::max_value() {
+        if i == $unsigned::MAX {
           break
         }
         i += $unsigned::from_bits (1);
@@ -92,8 +92,8 @@ fn main() {
   macro_rules! exhaustive_signed {
     ($signed:ident) => {
       println!("{}", std::iter::repeat ('~').take (80).collect::<String>());
-      show!($signed::min_value());
-      show!($signed::max_value());
+      show!($signed::MIN);
+      show!($signed::MAX);
       let mut file = if opts.occurrences_of ("plot-csv") > 0 {
         Some (std::fs::File::create (
           format!("{}.csv", stringify!($signed))).unwrap())
@@ -128,7 +128,7 @@ fn main() {
         if err_pct > max_err_pct.err_pct {
           max_err_pct = MaxErr { fixed, sqrt, exact, err_abs, err_pct };
         }
-        if i == $signed::max_value() {
+        if i == $signed::MAX {
           break
         }
         i += $signed::from_bits (1);
