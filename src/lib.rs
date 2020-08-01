@@ -85,8 +85,8 @@ pub trait FixedSqrt : Fixed {
 ////////////////////////////////////////////////////////////////////////////////
 
 macro_rules! impl_sqrt_unsigned {
-  ($unsigned:ident, $lt:ident$(, $higher:ty)?) => {
-    impl <U> FixedSqrt for $unsigned <U> where U : $lt {
+  ($unsigned:ident, $leq:ident, $higher:ty) => {
+    impl <U> FixedSqrt for $unsigned <U> where U : $leq {
       fn sqrt (self) -> Self {
         if U::USIZE % 2 == 0 {
           // even fractional bits
@@ -96,32 +96,37 @@ macro_rules! impl_sqrt_unsigned {
           )
         } else {
           // odd fractional bits
-          if std::mem::size_of::<$unsigned <U>>() == 16 {
-            unimplemented!("FixedU128 with odd fractional bits is not allowed")
+          let bits = self.to_bits();
+          let sqrt = if
+            bits & (1 as <$unsigned <U> as Fixed>::Bits).rotate_right (1) > 0
+          {
+            // NOTE: we compute on the unsigned integer type of the larger size
+            let bits = bits as $higher << 1;
+            let sqrt = bits.integer_sqrt() << (<$unsigned <U>
+              as Fixed>::Frac::USIZE/2);
+            // square root should be within max value
+            debug_assert!(
+              sqrt <= <$unsigned <U> as Fixed>::Bits::MAX as $higher);
+            sqrt as <$unsigned <U> as Fixed>::Bits
           } else {
-            let bits = self.to_bits();
-            let sqrt = if
-              bits & (1 as <$unsigned <U> as Fixed>::Bits).rotate_right (1) > 0
-            {
-              // NOTE: we compute on the unsigned integer type of the larger size
-              $(
-              let bits = bits as $higher << 1;
-              )?
-              let sqrt = bits.integer_sqrt() << (<$unsigned <U>
-                as Fixed>::Frac::USIZE/2);
-              // square root should be within max value
-              $(
-              debug_assert!(
-                sqrt <= <$unsigned <U> as Fixed>::Bits::MAX as $higher);
-              )?
-              sqrt as <$unsigned <U> as Fixed>::Bits
-            } else {
-              let bits = bits << 1;
-              bits.integer_sqrt() << (<$unsigned <U> as Fixed>::Frac::USIZE/2)
-            };
-            $unsigned::from_bits (sqrt)
-          }
+            let bits = bits << 1;
+            bits.integer_sqrt() << (<$unsigned <U> as Fixed>::Frac::USIZE/2)
+          };
+          $unsigned::from_bits (sqrt)
         }
+      }
+    }
+  }
+}
+
+macro_rules! impl_sqrt_unsigned_u128 {
+  ($unsigned:ident, $leq:ident) => {
+    impl <U> FixedSqrt for $unsigned <U> where U : $leq + IsEven {
+      fn sqrt (self) -> Self {
+        $unsigned::from_bits (
+          self.to_bits().integer_sqrt() <<
+            (<$unsigned <U> as Fixed>::Frac::USIZE/2)
+        )
       }
     }
   }
@@ -131,7 +136,7 @@ impl_sqrt_unsigned!(FixedU8,   LeEqU8,   u16);
 impl_sqrt_unsigned!(FixedU16,  LeEqU16,  u32);
 impl_sqrt_unsigned!(FixedU32,  LeEqU32,  u64);
 impl_sqrt_unsigned!(FixedU64,  LeEqU64,  u128);
-impl_sqrt_unsigned!(FixedU128, LeEqU128);
+impl_sqrt_unsigned_u128!(FixedU128, LeEqU128);
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -519,12 +524,6 @@ mod tests {
   #[should_panic]
   fn test_sqrt_negative() {
     I16F16::from_num (-1.0).sqrt();
-  }
-
-  #[test]
-  #[should_panic]
-  fn test_sqrt_u128_odd_bits() {
-    U95F33::from_num (4.0).sqrt();
   }
 
   #[test]
