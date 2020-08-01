@@ -1,3 +1,5 @@
+#![no_std]
+
 //! Square root trait for [fixed-point numbers](https://docs.rs/fixed) using
 //! [integer square root](https://docs.rs/integer-sqrt) algorithm.
 //!
@@ -49,6 +51,11 @@
 //! # Panics
 //!
 //! - Panics if called on a negative signed number
+
+// Used to make the tests build and run.
+#[cfg(test)]
+#[macro_use]
+extern crate std;
 
 #[allow(unused_macros)]
 macro_rules! show {
