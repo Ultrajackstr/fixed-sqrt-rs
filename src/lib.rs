@@ -70,10 +70,8 @@ use fixed::{FixedI8, FixedI16, FixedI32, FixedI64, FixedU8, FixedU16, FixedU32,
 use fixed::traits::Fixed;
 use fixed::types::extra::*;
 use integer_sqrt::IntegerSquareRoot;
-use typenum::{UInt, UTerm};
-use typenum::bit::{B0, B1};
 
-pub mod traits;
+mod traits;
 
 use self::traits::*;
 
@@ -86,110 +84,89 @@ pub trait FixedSqrt : Fixed {
 //  unsigned
 ////////////////////////////////////////////////////////////////////////////////
 
-macro_rules! impl_sqrt_unsigned_even {
-  ($unsigned:ident, $lt:ident) => {
-    impl FixedSqrt for $unsigned <UTerm> {
+macro_rules! impl_sqrt_unsigned {
+  ($unsigned:ident, $lt:ident$(, $higher:ty)?) => {
+    impl <U> FixedSqrt for $unsigned <U> where U : $lt {
       fn sqrt (self) -> Self {
-        $unsigned::from_bits (
-          self.to_bits().integer_sqrt() <<
-            (<$unsigned <UTerm> as Fixed>::Frac::USIZE/2)
-        )
-      }
-    }
-    impl <U> FixedSqrt for $unsigned <UInt <U, B0>> where
-      UInt <U, B0> : $lt
-    {
-      fn sqrt (self) -> Self {
-        $unsigned::from_bits (
-          self.to_bits().integer_sqrt() <<
-            (<$unsigned <UInt <U, B0>> as Fixed>::Frac::USIZE/2)
-        )
-      }
-    }
-  }
-}
-
-macro_rules! impl_sqrt_unsigned_odd {
-  ($unsigned:ident, $leq:ident, $higher:ty) => {
-    impl <U> FixedSqrt for $unsigned <UInt <U, B1>> where
-      UInt <U, B1> : $leq
-    {
-      fn sqrt (self) -> Self {
-        let bits = self.to_bits();
-        let sqrt = if
-          bits & (1 as <$unsigned <UInt <U, B1>> as Fixed>::Bits).rotate_right (1) > 0
-        {
-          // NOTE: we compute on the unsigned integer type of the larger size
-          let bits = bits as $higher << 1;
-          let sqrt = bits.integer_sqrt() << (<$unsigned <UInt <U, B1>>
-            as Fixed>::Frac::USIZE/2);
-          // square root should be within max value
-          debug_assert!(sqrt <=
-            <$unsigned <UInt <U, B1>> as Fixed>::Bits::MAX as $higher);
-          sqrt as <$unsigned <UInt <U, B1>> as Fixed>::Bits
+        if U::USIZE % 2 == 0 {
+          // even fractional bits
+          $unsigned::from_bits (
+            self.to_bits().integer_sqrt() <<
+              (<$unsigned <U> as Fixed>::Frac::USIZE/2)
+          )
         } else {
-          let bits = bits << 1;
-          bits.integer_sqrt() << (<$unsigned <UInt <U, B1>> as Fixed>::Frac::USIZE/2)
-        };
-        $unsigned::from_bits (sqrt)
+          // odd fractional bits
+          if std::mem::size_of::<$unsigned <U>>() == 16 {
+            unimplemented!("FixedU128 with odd fractional bits is not allowed")
+          } else {
+            let bits = self.to_bits();
+            let sqrt = if
+              bits & (1 as <$unsigned <U> as Fixed>::Bits).rotate_right (1) > 0
+            {
+              // NOTE: we compute on the unsigned integer type of the larger size
+              $(
+              let bits = bits as $higher << 1;
+              )?
+              let sqrt = bits.integer_sqrt() << (<$unsigned <U>
+                as Fixed>::Frac::USIZE/2);
+              // square root should be within max value
+              $(
+              debug_assert!(
+                sqrt <= <$unsigned <U> as Fixed>::Bits::MAX as $higher);
+              )?
+              sqrt as <$unsigned <U> as Fixed>::Bits
+            } else {
+              let bits = bits << 1;
+              bits.integer_sqrt() << (<$unsigned <U> as Fixed>::Frac::USIZE/2)
+            };
+            $unsigned::from_bits (sqrt)
+          }
+        }
       }
     }
   }
 }
 
-impl_sqrt_unsigned_even!(FixedU8,   LeEqU8);
-impl_sqrt_unsigned_even!(FixedU16,  LeEqU16);
-impl_sqrt_unsigned_even!(FixedU32,  LeEqU32);
-impl_sqrt_unsigned_even!(FixedU64,  LeEqU64);
-impl_sqrt_unsigned_even!(FixedU128, LeEqU128);
-impl_sqrt_unsigned_odd!(FixedU8,   LeEqU8,   u16);
-impl_sqrt_unsigned_odd!(FixedU16,  LeEqU16,  u32);
-impl_sqrt_unsigned_odd!(FixedU32,  LeEqU32,  u64);
-impl_sqrt_unsigned_odd!(FixedU64,  LeEqU64,  u128);
-//impl_sqrt_unsigned_odd!(FixedU128, LeEqU128, u256);   // unimplemented
+impl_sqrt_unsigned!(FixedU8,   LeEqU8,   u16);
+impl_sqrt_unsigned!(FixedU16,  LeEqU16,  u32);
+impl_sqrt_unsigned!(FixedU32,  LeEqU32,  u64);
+impl_sqrt_unsigned!(FixedU64,  LeEqU64,  u128);
+impl_sqrt_unsigned!(FixedU128, LeEqU128);
+
 
 ////////////////////////////////////////////////////////////////////////////////
 //  signed
 ////////////////////////////////////////////////////////////////////////////////
 
-macro_rules! impl_sqrt_signed_even {
+macro_rules! impl_sqrt_signed {
   ($signed:ident, $lt:ident, $unsigned:ty) => {
-    impl FixedSqrt for $signed <UTerm> {
+    impl <U> FixedSqrt for $signed <U> where U : $lt {
       fn sqrt (self) -> Self {
         if self.is_negative() {
           panic!("fixed point square root of a negative number");
         }
-        // NOTE: as of integer-sqrt v0.1.2 there seems to be a bug when
-        // computing sqrt using signed 32bit and 128bit integers, we can just
-        // use unsigned integers instead
-        let bits = self.to_bits() as $unsigned;
+        let bits = if U::USIZE % 2 == 0 {
+          // NOTE: as of integer-sqrt v0.1.2 there seems to be a bug when
+          // computing sqrt using signed 32bit and 128bit integers, we can just
+          // use unsigned integers instead
+          self.to_bits() as $unsigned
+        } else {
+          // because the msb of a non-negative number is zero, it is always safe
+          // to shift, but we need to compute the square root on the unsigned
+          // integer type
+          debug_assert_eq!(
+            self.to_bits() &
+              (1 as <$signed <U> as Fixed>::Bits).rotate_right (1),
+            0x0);
+          // NOTE: we compute on the unsigned integer type of the same size
+          // since the sign bit is zero we can shift into it
+          (self.to_bits() << 1) as $unsigned
+        };
         let sqrt = bits.integer_sqrt() <<
-          (<$signed <UTerm> as Fixed>::Frac::USIZE/2);
-        let n = $signed::from_bits (sqrt as <$signed <UTerm> as Fixed>::Bits);
+          (<$signed <U> as Fixed>::Frac::USIZE/2);
+        let n = $signed::from_bits (sqrt as <$signed <U> as Fixed>::Bits);
         // NOTE: by excluding the case with zero integer bits, this assertion
-        // should never fail
-        debug_assert!(n.count_ones() == 0 || n.is_positive());
-        n
-      }
-    }
-
-    impl <U> FixedSqrt for $signed <UInt <U, B0>> where
-      UInt <U, B0> : $lt
-    {
-      fn sqrt (self) -> Self {
-        if self.is_negative() {
-          panic!("fixed point square root of a negative number");
-        }
-        // NOTE: as of integer-sqrt v0.1.2 there seems to be a bug when
-        // computing sqrt using signed 32bit and 128bit integers, we can just
-        // use unsigned integers instead
-        let bits = self.to_bits() as $unsigned;
-        let sqrt = bits.integer_sqrt() <<
-          (<$signed <UInt <U, B0>> as Fixed>::Frac::USIZE/2);
-        let n = $signed::from_bits (sqrt
-          as <$signed <UInt <U, B0>> as Fixed>::Bits);
-        // NOTE: by excluding the case with zero integer bits, this assertion
-        // should never fail
+        // should never fail for non-zero even or odd fractional bits
         debug_assert!(n.count_ones() == 0 || n.is_positive());
         n
       }
@@ -197,47 +174,11 @@ macro_rules! impl_sqrt_signed_even {
   }
 }
 
-macro_rules! impl_sqrt_signed_odd {
-  ($signed:ident, $leq:ident, $unsigned:ty) => {
-    impl <U> FixedSqrt for $signed <UInt <U, B1>> where
-      UInt <U, B1> : $leq
-    {
-      fn sqrt (self) -> Self {
-        if self.is_negative() {
-          panic!("fixed point square root of a negative number");
-        }
-        // because the msb of a non-negative number is zero, it is always
-        // safe to shift, but we need to compute the square root on the unsigned
-        // integer type
-        debug_assert_eq!(
-          self.to_bits() &
-            (1 as <$signed <UInt <U, B1>> as Fixed>::Bits).rotate_right (1),
-          0x0);
-        // NOTE: we compute on the unsigned integer type of the same size since
-        // the sign bit is zero we can shift into it
-        let bits = (self.to_bits() << 1) as $unsigned;
-        let sqrt = bits.integer_sqrt() <<
-          (<$signed <UInt <U, B1>> as Fixed>::Frac::USIZE/2);
-        let n = $signed::from_bits (sqrt
-          as <$signed <UInt <U, B1>> as Fixed>::Bits);
-        // NOTE: this should never fail for odd fractional bits
-        debug_assert!(n.count_ones() == 0 || n.is_positive());
-        n
-      }
-    }
-  }
-}
-
-impl_sqrt_signed_even!(FixedI8,   LtU8,   u8);
-impl_sqrt_signed_even!(FixedI16,  LtU16,  u16);
-impl_sqrt_signed_even!(FixedI32,  LtU32,  u32);
-impl_sqrt_signed_even!(FixedI64,  LtU64,  u64);
-impl_sqrt_signed_even!(FixedI128, LtU128, u128);
-impl_sqrt_signed_odd!(FixedI8,   LeEqU8,   u8);
-impl_sqrt_signed_odd!(FixedI16,  LeEqU16,  u16);
-impl_sqrt_signed_odd!(FixedI32,  LeEqU32,  u32);
-impl_sqrt_signed_odd!(FixedI64,  LeEqU64,  u64);
-impl_sqrt_signed_odd!(FixedI128, LeEqU128, u128);
+impl_sqrt_signed!(FixedI8,   LtU8,   u8);
+impl_sqrt_signed!(FixedI16,  LtU16,  u16);
+impl_sqrt_signed!(FixedI32,  LtU32,  u32);
+impl_sqrt_signed!(FixedI64,  LtU64,  u64);
+impl_sqrt_signed!(FixedI128, LtU128, u128);
 
 ////////////////////////////////////////////////////////////////////////////////
 //  tests
@@ -248,7 +189,7 @@ mod tests {
   use super::*;
   use fixed::types::*;
   //use fixed::types::extra::*;
-  use typenum::{Shright, Sub1};
+  use typenum::{B0, B1, Shright, Sub1, UInt};
 
   #[test]
   fn test_sqrt() {
@@ -483,7 +424,8 @@ mod tests {
         }
 
         fn $fun_odd<U>(base: f64, range: i32) where
-          UInt <U, B1> : Unsigned + IsLessOrEqual<$unsigned, Output = True>
+          UInt <U, B1> : Unsigned + typenum::IsLess <$unsigned, Output = True> +
+            IsLessOrEqual<$unsigned, Output = True>
         {
           for i in 0..range {
             let h_f64 = base.powi(i);
@@ -577,6 +519,12 @@ mod tests {
   #[should_panic]
   fn test_sqrt_negative() {
     I16F16::from_num (-1.0).sqrt();
+  }
+
+  #[test]
+  #[should_panic]
+  fn test_sqrt_u128_odd_bits() {
+    U95F33::from_num (4.0).sqrt();
   }
 
   #[test]
