@@ -8,7 +8,7 @@ defined in the [`fixed`](https://crates.io/crates/fixed) crate, using the
 integer square root algorithm provided by the
 [`integer-sqrt`](https://crates.io/crates/integer-sqrt) crate.
 
-[Documentation](https://docs.rs/macro-machines)
+[Documentation](https://docs.rs/fixed-sqrt)
 
 ## Implementation
 
