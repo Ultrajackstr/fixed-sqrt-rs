@@ -78,7 +78,7 @@ use fixed::traits::Fixed;
 use fixed::types::extra::*;
 use integer_sqrt::IntegerSquareRoot;
 
-mod traits;
+pub mod traits;
 
 use self::traits::*;
 

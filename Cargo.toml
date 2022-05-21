@@ -1,6 +1,6 @@
 [package]
 name = "fixed-sqrt"
-version = "0.2.4"
+version = "0.2.5"
 authors = ["Shane Pearman <spearman@gitlab.com>"]
 license = "Apache-2.0"
 description = "Square root for fixed-point numbers"
