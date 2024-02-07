@@ -11,6 +11,6 @@ edition = "2018"
 
 [dependencies]
 #fixed = "1.*"
-fixed = "2.0.0-alpha.12"
+fixed = "2.0.0-alpha.25.1"
 integer-sqrt = "0.1"
 typenum = "1"
